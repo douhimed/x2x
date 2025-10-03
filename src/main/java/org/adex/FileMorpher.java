@@ -89,7 +89,6 @@ final class SrcValidator implements Validator<Path> {
             },
 
             src -> {
-
                 if (!Files.isRegularFile(src)) {
                     throw new IllegalArgumentException("Source path exists but is not a regular file: " + src);
                 }
