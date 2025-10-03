@@ -17,7 +17,7 @@ class FileMorpherImpl implements FileMorpher {
 
     @Override
     public Output execute(Input in) {
-        return null;
+        return new Output("NEED TO BE IMPLEMENTED");
     }
 }
 
@@ -53,6 +53,9 @@ final class FileMorpherInitializer {
 
     public String start() {
         validate();
+        if(Objects.isNull(morpher)) {
+            withDefaultMorpher();
+        }
         return morpher.execute(new Input(src, dest)).path();
     }
 
