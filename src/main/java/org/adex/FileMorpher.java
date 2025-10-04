@@ -2,25 +2,20 @@ package org.adex;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public interface FileMorpher {
 
-    Output execute(Input in);
+    Map<String, Map<String, FileMorpherAlgo>> ALGOS = Map.of(
+            "properties", Map.of("yml", new Properties2Yml(), "yaml", new Properties2Yml())
+    );
 
-}
-
-class FileMorpherImpl implements FileMorpher {
-
-    @Override
-    public Output execute(Input in) {
-        return new Output("NEED TO BE IMPLEMENTED");
+    static Output execute(Input in) {
+        return ALGOS.get(in.extension()).get(in.dest()).getAlgo().apply(in);
     }
 }
-
 
 final class FileMorpherInitializer {
 
@@ -41,31 +36,23 @@ final class FileMorpherInitializer {
         return this;
     }
 
-    public FileMorpherInitializer withDefaultMorpher() {
-        this.morpher = new FileMorpherImpl();
-        return this;
-    }
-
-    public FileMorpherInitializer withMorpher(FileMorpher morpher) {
-        this.morpher = morpher;
-        return this;
-    }
-
     public String start() {
         validate();
-        if(Objects.isNull(morpher)) {
-            withDefaultMorpher();
-        }
-        return morpher.execute(new Input(src, dest)).path();
+        return FileMorpher.execute(new Input(src, getExtension(), dest)).path();
     }
 
     private void validate() {
         SRC_VALIDATOR.validate(src);
         DEST_VALIDATOR.validate(dest);
     }
+
+    private String getExtension() {
+        final String fileName = src.getFileName().toString();
+        return fileName.substring(fileName.lastIndexOf(".") + 1);
+    }
 }
 
-record Input(Path src, String dest) {
+record Input(Path path, String extension, String dest) {
 }
 
 record Output(String path) {
@@ -152,5 +139,16 @@ final class StringUtils {
 
     public static boolean isBlank(String s) {
         return Objects.isNull(s) || s.trim().isBlank();
+    }
+}
+
+sealed interface FileMorpherAlgo permits Properties2Yml {
+    Function<Input, Output> getAlgo();
+}
+
+final class Properties2Yml implements FileMorpherAlgo {
+    @Override
+    public Function<Input, Output> getAlgo() {
+        return in -> new Output("NOT YEET BEEN IMPLEMENTED");
     }
 }
