@@ -13,6 +13,7 @@ public interface Repl {
                         .from(args[0])
                         .to(args[1])
                         .start()
+                        .getFileName()
         );
     }
 }

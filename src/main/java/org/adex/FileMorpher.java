@@ -1,10 +1,12 @@
 package org.adex;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 public interface FileMorpher {
 
@@ -26,6 +28,8 @@ final class FileMorpherInitializer {
     private String dest;
     private FileMorpher morpher;
 
+    private Output output;
+
     public FileMorpherInitializer from(String src) {
         this.src = Path.of(src);
         return this;
@@ -36,9 +40,18 @@ final class FileMorpherInitializer {
         return this;
     }
 
-    public String start() {
+    public FileMorpherInitializer start() {
         validate();
-        return FileMorpher.execute(new Input(src, getExtension(), dest)).path();
+        output = FileMorpher.execute(new Input(src, getExtension(), dest));
+        return this;
+    }
+
+    public Path path() {
+        return output.path();
+    }
+
+    public String getFileName() {
+        return output.path().toAbsolutePath().toString();
     }
 
     private void validate() {
@@ -55,7 +68,7 @@ final class FileMorpherInitializer {
 record Input(Path path, String extension, String dest) {
 }
 
-record Output(String path) {
+record Output(Path path) {
 }
 
 sealed interface Validator<T> permits DestinationValidator, SrcValidator {
@@ -140,6 +153,10 @@ final class StringUtils {
     public static boolean isBlank(String s) {
         return Objects.isNull(s) || s.trim().isBlank();
     }
+
+    public static boolean isNotBlank(String s) {
+        return !isBlank(s);
+    }
 }
 
 sealed interface FileMorpherAlgo permits Properties2Yml {
@@ -147,8 +164,78 @@ sealed interface FileMorpherAlgo permits Properties2Yml {
 }
 
 final class Properties2Yml implements FileMorpherAlgo {
+
+    public static final Function<Input, Output> ALGO = in -> {
+        try (Stream<String> lines = Files.lines(in.path())) {
+
+            final Map<String, Object> root = new HashMap<>();
+
+            lines
+                    .filter(Properties2Yml::isValidKeyValue)
+                    .map(line -> line.split("=", 2))
+                    .forEach(data -> insertData(root, data[0].trim(), data[1].trim()));
+
+            final StringBuilder content = new StringBuilder();
+            buildContent(root, content, 0);
+
+            return new Output(Files.writeString(resolveDestinationPath(in), content));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+    };
+
     @Override
     public Function<Input, Output> getAlgo() {
-        return in -> new Output("NOT YEET BEEN IMPLEMENTED");
+        return ALGO;
+    }
+
+
+    private static Path resolveDestinationPath(Input in) {
+        var originalPath = in.path();
+        var fileName = originalPath.getFileName().toString();
+        var baseName = fileName.contains(".") ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+
+        var ext = in.dest().startsWith(".") ? in.dest() : "." + in.dest();
+
+        return originalPath.resolveSibling(baseName + ext);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void insertData(Map<String, Object> root, String key, String value) {
+        String[] keys = key.split("\\.");
+        Map<String, Object> current = root;
+
+        for (int i = 0; i < keys.length; i++) {
+            String keyPart = keys[i];
+            if (i == keys.length - 1) {
+                current.put(keyPart, value);
+            } else {
+                current = (Map<String, Object>) current.computeIfAbsent(keyPart, k -> new HashMap<String, Object>());
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void buildContent(Map<String, Object> node, StringBuilder sb, int indentLevel) {
+        String indent = "  ".repeat(indentLevel);
+
+        for (var entry : node.entrySet()) {
+            var key = entry.getKey();
+            var value = entry.getValue();
+
+            if (value instanceof String str) {
+                sb.append(indent).append(key).append(": ").append(str).append("\n");
+            } else if (value instanceof Map<?, ?> map) {
+                sb.append(indent).append(key).append(":\n");
+                buildContent((Map<String, Object>) map, sb, indentLevel + 1);
+            } else {
+                sb.append(indent).append(key).append(": ").append(value).append("\n");
+            }
+        }
+    }
+
+    private static boolean isValidKeyValue(String line) {
+        return StringUtils.isNotBlank(line) && !line.startsWith("#") && line.contains("=");
     }
 }
