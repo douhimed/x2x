@@ -10,8 +10,10 @@ import java.util.stream.Stream;
 
 public interface FileMorpher {
 
+    Properties2Yml PROPERTIES_2_YML = new Properties2Yml();
+
     Map<String, Map<String, FileMorpherAlgo>> ALGOS = Map.of(
-            "properties", Map.of("yml", new Properties2Yml(), "yaml", new Properties2Yml())
+            "properties", Map.of("yml", PROPERTIES_2_YML, "yaml", PROPERTIES_2_YML)
     );
 
     static Output execute(Input in) {
