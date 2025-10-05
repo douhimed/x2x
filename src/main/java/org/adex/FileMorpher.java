@@ -209,7 +209,8 @@ final class Properties2Yml implements FileMorpherAlgo {
         for (int i = 0; i < keys.length; i++) {
             String keyPart = keys[i];
             if (i == keys.length - 1) {
-                current.put(keyPart, value);
+                String newValue = value.toLowerCase().replace("_", "-");
+                current.put(keyPart, newValue);
             } else {
                 current = (Map<String, Object>) current.computeIfAbsent(keyPart, k -> new HashMap<String, Object>());
             }
