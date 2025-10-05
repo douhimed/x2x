@@ -168,7 +168,7 @@ final class Properties2Yml implements FileMorpherAlgo {
     public static final Function<Input, Output> ALGO = in -> {
         try (Stream<String> lines = Files.lines(in.path())) {
 
-            final Map<String, Object> root = new HashMap<>();
+            final Map<String, Object> root = new TreeMap<>();
 
             lines
                     .filter(Properties2Yml::isValidKeyValue)
@@ -212,7 +212,7 @@ final class Properties2Yml implements FileMorpherAlgo {
                 String newValue = value.toLowerCase().replace("_", "-");
                 current.put(keyPart, newValue);
             } else {
-                current = (Map<String, Object>) current.computeIfAbsent(keyPart, k -> new HashMap<String, Object>());
+                current = (Map<String, Object>) current.computeIfAbsent(keyPart, k -> new TreeMap<>());
             }
         }
     }
