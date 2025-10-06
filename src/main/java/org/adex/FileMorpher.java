@@ -144,22 +144,8 @@ final class DestinationValidator implements Validator<String> {
 }
 
 /**
- * Utils Classes
+ * ALGO
  */
-final class StringUtils {
-
-    private StringUtils() {
-        throw new RuntimeException("Bruuh...");
-    }
-
-    public static boolean isBlank(String s) {
-        return Objects.isNull(s) || s.trim().isBlank();
-    }
-
-    public static boolean isNotBlank(String s) {
-        return !isBlank(s);
-    }
-}
 
 sealed interface FileMorpherAlgo permits Properties2Yml {
     Function<Input, Output> getAlgo();
@@ -206,15 +192,42 @@ final class Properties2Yml implements FileMorpherAlgo {
     @SuppressWarnings("unchecked")
     private static void insertData(Map<String, Object> root, String key, String value) {
         String[] keys = key.split("\\.");
-        Map<String, Object> current = root;
+        Map<String, Object> currentMap = root;
 
         for (int i = 0; i < keys.length; i++) {
             String keyPart = keys[i];
-            if (i == keys.length - 1) {
-                String newValue = value.toLowerCase().replace("_", "-");
-                current.put(keyPart, newValue);
+
+            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(.+)\\[(\\d+)]").matcher(keyPart);
+            boolean isArrayElement = matcher.matches();
+
+            if (isArrayElement) {
+                String arrayKey = matcher.group(1);
+                int index = Integer.parseInt(matcher.group(2));
+
+                List<Object> list = (List<Object>) currentMap.computeIfAbsent(arrayKey, k -> new ArrayList<>());
+
+                while (list.size() <= index) {
+                    list.add(null);
+                }
+
+                if (i == keys.length - 1) {
+                    String newValue = value.toLowerCase().replace("_", "-");
+                    list.set(index, newValue);
+                } else {
+                    Map<String, Object> nestedMap = (Map<String, Object>) list.get(index);
+                    if (nestedMap == null) {
+                        nestedMap = new TreeMap<>();
+                        list.set(index, nestedMap);
+                    }
+                    currentMap = nestedMap;
+                }
             } else {
-                current = (Map<String, Object>) current.computeIfAbsent(keyPart, k -> new TreeMap<>());
+                if (i == keys.length - 1) {
+                    String newValue = value.toLowerCase().replace("_", "-");
+                    currentMap.put(keyPart, newValue);
+                } else {
+                    currentMap = (Map<String, Object>) currentMap.computeIfAbsent(keyPart, k -> new TreeMap<>());
+                }
             }
         }
     }
@@ -227,18 +240,47 @@ final class Properties2Yml implements FileMorpherAlgo {
             var key = entry.getKey();
             var value = entry.getValue();
 
-            if (value instanceof String str) {
-                sb.append(indent).append(key).append(": ").append(str).append("\n");
-            } else if (value instanceof Map<?, ?> map) {
-                sb.append(indent).append(key).append(":\n");
-                buildContent((Map<String, Object>) map, sb, indentLevel + 1);
-            } else {
-                sb.append(indent).append(key).append(": ").append(value).append("\n");
+            switch (value) {
+                case String str -> sb.append(indent).append(key).append(": ").append(str).append("\n");
+                case Map<?, ?> map -> {
+                    sb.append(indent).append(key).append(":\n");
+                    buildContent((Map<String, Object>) map, sb, indentLevel + 1);
+                }
+                case List<?> list -> {
+                    sb.append(indent).append(key).append(":\n");
+                    for (Object item : list) {
+                        if (item instanceof Map<?, ?> itemMap) {
+                            sb.append(indent).append("  -\n");
+                            buildContent((Map<String, Object>) itemMap, sb, indentLevel + 2);
+                        } else {
+                            sb.append(indent).append("  - ").append(item).append("\n");
+                        }
+                    }
+                }
+                case null, default -> sb.append(indent).append(key).append(": ").append(value).append("\n");
             }
         }
     }
 
     private static boolean isValidKeyValue(String line) {
         return StringUtils.isNotBlank(line) && !line.startsWith("#") && line.contains("=");
+    }
+}
+
+/**
+ * Utils Classes
+ */
+final class StringUtils {
+
+    private StringUtils() {
+        throw new RuntimeException("Bruuh...");
+    }
+
+    public static boolean isBlank(String s) {
+        return Objects.isNull(s) || s.trim().isBlank();
+    }
+
+    public static boolean isNotBlank(String s) {
+        return !isBlank(s);
     }
 }
